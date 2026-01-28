@@ -2,7 +2,7 @@
 Unit tests for the reshaping operations
 """
 import torch
-from src.modules.reshape_ops import (
+from src.utils.reshape_ops import (
     spatial_to_temporal,
     temporal_to_spatial
 )
