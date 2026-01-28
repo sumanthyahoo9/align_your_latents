@@ -83,15 +83,14 @@ class UpBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        skip_channels: int,  # From encoder skip connection
+        skip_channels: int,
         time_emb_dim: int = 1280,
         num_groups: int = 32,
-        use_attention: bool = False
+        use_attention: bool = False,
+        do_upsample: bool = True
     ):
         super().__init__()
-        
-        # Upsample first
-        self.upsample = nn.ConvTranspose2d(in_channels, in_channels, 4, stride=2, padding=1)
+        self.do_upsample = do_upsample
         
         # After concat with skip: in_channels + skip_channels
         total_channels = in_channels + skip_channels
@@ -113,6 +112,9 @@ class UpBlock(nn.Module):
         # Optional attention
         self.attention = SpatialAttention(out_channels) if use_attention else nn.Identity()
         
+        # Upsample LAST - operates on out_channels!
+        self.upsample = nn.ConvTranspose2d(out_channels, out_channels, 4, stride=2, padding=1)  # ← FIX!
+        
         self.silu = nn.SiLU()
     
     def forward(
@@ -126,8 +128,6 @@ class UpBlock(nn.Module):
         skip: (B, skip_channels, H*2, W*2) from encoder
         t_emb: (B, time_emb_dim)
         """
-        # Upsample
-        x = self.upsample(x)  # (B, in_channels, H*2, W*2)
         
         # Concatenate with skip
         x = torch.cat([x, skip], dim=1)  # (B, in_channels+skip_channels, H*2, W*2)
@@ -155,6 +155,9 @@ class UpBlock(nn.Module):
         
         # Attention
         x = self.attention(x)
+        # Upsample
+        if self.do_upsample:
+            x = self.upsample(x)  # (B, in_channels, H*2, W*2)
         
         return x
 
