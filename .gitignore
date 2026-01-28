@@ -1,0 +1,7 @@
+# PDF files
+*.pdf
+# venv files
+ldm_video_env/
+# System files
+.DS_Store
+*.pyc

@@ -1,0 +1,39 @@
+# Core ML/DL
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+einops>=0.7.0
+
+# Video processing
+opencv-python>=4.8.0
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.9
+av>=10.0.0
+
+# Image processing
+Pillow>=10.0.0
+scikit-image>=0.21.0
+
+# Training utilities
+tqdm>=4.65.0
+wandb>=0.15.0
+tensorboard>=2.13.0
+
+# Configuration
+omegaconf>=2.3.0
+pyyaml>=6.0
+
+# Evaluation metrics
+scipy>=1.11.0
+lpips>=0.1.4
+
+# Development/Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.4.0
+
+# Optional: Pre-trained models
+transformers>=4.30.0
+diffusers>=0.18.0
