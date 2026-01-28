@@ -12,7 +12,6 @@ class Conv3DBlock(nn.Module):
     """
     def __init__(self, channels: int, kernel_size:int = 3):
         super().__init__()
-        self.alpha = nn.Parameter(torch.zeros(1))
         self.padding = (1, 1, 1)
         self.conv_3d = nn.Conv3d(channels, channels, kernel_size=kernel_size, padding=self.padding)
         self.relu = nn.ReLU()
@@ -22,8 +21,6 @@ class Conv3DBlock(nn.Module):
         """
         Forward pass
         """
-        z = x
         x = self.conv_3d(x)
         x = self.group_norm(self.relu(x))
-        x = self.alpha*z + (1-self.alpha)*x
         return x
