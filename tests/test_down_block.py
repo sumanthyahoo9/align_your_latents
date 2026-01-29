@@ -2,7 +2,7 @@
 Test ONE DownBlock of the U-net
 """
 import torch
-from src.models.unet_blocks import DownBlock, UpBlock
+from src.models.unet_blocks import DownBlock
 
 def test_down_block():
     """
