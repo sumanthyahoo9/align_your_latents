@@ -3,6 +3,7 @@ The Video Latent Diffusion model which combines all modules
 """
 import torch
 import torch.nn as nn
+from einops import rearrange
 from src.models.u_net import UNet
 from src.modules.temporal_layers import TemporalLayer
 
@@ -47,6 +48,7 @@ class VideoUnet(UNet):
         self.temporal_block_indices = []  # Maps block index → True/False
         self.temporal_layers = nn.ModuleList()
         self.alphas = nn.ParameterList()
+
         # ========== ENCODER ==========
         current_res = input_resolution
         block_idx = 0
@@ -67,6 +69,7 @@ class VideoUnet(UNet):
             # Downsampling reduces resolution
             if level < len(channels):
                 current_res //= 2
+
         # ========== BOTTLENECK ==========
         num_bottleneck = 2 # 2 bottleneck layers
         for _ in range(num_bottleneck):
@@ -81,6 +84,7 @@ class VideoUnet(UNet):
                 )
                 self.alphas.append(nn.Parameter(torch.ones(1)))
             block_idx += 1
+
         # ========== DECODER ==========
         for level in reversed(range(len(channels))):
             out_ch = channels[level]
@@ -106,3 +110,16 @@ class VideoUnet(UNet):
         t: (B,) timesteps
         Returns (B, C, T, H, W) processed video
         """
+        # ========== SECTION 1: PREPARE INPUT ==========
+        # Get dimensions from x (B, C, T, H, W)
+        B, C, T, H, W = x.shape
+        # Get time embedding using self.time_embed(t)
+        time_emb = self.time_embed(t)
+        # Reshape x from (B, C, T, H, W) to (B*T, C, H, W)
+        x = rearrange(x, "b c t h w -> (b t) c h w")
+
+        # ========== SECTION 2: INITIAL CONV ==========
+        # Pass through self.conv_in
+        x = self.conv_in(x) # (B*T, C, H, W) --> (B*T, base_channels, H, W)
+
+        # ========== SECTION 3: ENCODER WITH TEMPORAL ==========
