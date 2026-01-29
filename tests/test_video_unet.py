@@ -16,6 +16,7 @@ def test_video_unet():
         channel_mult=(1, 2),
         num_res_blocks=1,
         input_resolution=64,
+        attention_resolutions=(),
         add_temporal_at_resolutions=(32,)
     )
     x = torch.randn(B, C, T, H, W)
