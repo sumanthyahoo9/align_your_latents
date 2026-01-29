@@ -56,6 +56,7 @@ class VideoUnet(UNet):
             for _ in range(num_res_blocks):
                 # Check if this resolution needs a temporal layer
                 if current_res in add_temporal_at_resolutions:
+                    print(f"Block {block_idx}: Creating temporal at res={current_res}, channels={out_ch}")
                     self.temporal_block_indices.append(block_idx)
                     self.temporal_layers.append(
                         TemporalLayer(
@@ -88,6 +89,8 @@ class VideoUnet(UNet):
         # ========== DECODER ==========
         for level in reversed(range(len(channels))):
             out_ch = channels[level]
+            if level > 0:
+                current_res *= 2
             for _ in range(num_res_blocks):
                 if current_res in add_temporal_at_resolutions:
                     self.temporal_block_indices.append(block_idx)
@@ -100,8 +103,6 @@ class VideoUnet(UNet):
                     )
                     self.alphas.append(nn.Parameter(torch.ones(1)))
                 block_idx += 1
-            if level > 0:
-                current_res *= 2
         print(f"Created {len(self.temporal_layers)} temporal layers at resolutions {add_temporal_at_resolutions}")
     
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
@@ -115,6 +116,7 @@ class VideoUnet(UNet):
         B, C, T, H, W = x.shape
         # Get time embedding using self.time_embed(t)
         time_emb = self.time_embed(t)
+        time_emb = time_emb.repeat_interleave(T, dim=0) # (B, time_emb_dim) -> (B*T, time_emb_dim)
         # Reshape x from (B, C, T, H, W) to (B*T, C, H, W)
         x = rearrange(x, "b c t h w -> (b t) c h w")
 
@@ -123,3 +125,79 @@ class VideoUnet(UNet):
         x = self.conv_in(x) # (B*T, C, H, W) --> (B*T, base_channels, H, W)
 
         # ========== SECTION 3: ENCODER WITH TEMPORAL ==========
+        skips = []
+        temporal_layer_idx = 0 # Track which temporal layer to use
+        downsample_idx = 0
+        for block_idx, block in enumerate(self.encoder_blocks):
+            # Apply the Spatial block
+            z = block(x, time_emb)
+            # Check if this block needs temporal processing
+            if block_idx in self.temporal_block_indices:
+                temp_layer = self.temporal_layers[temporal_layer_idx] # Index using the temporal layer index
+                alpha = self.alphas[temporal_layer_idx] # Index using the temporal layer index
+                # Apply temporal layer
+                z_video = rearrange(z, "(b t) c h w -> b c t h w", b=B, t=T)
+                # Apply temporal layer
+                z_prime_video = temp_layer(z_video)
+                # Reshape
+                z_prime = rearrange(z_prime_video, "b c t h w -> (b t) c h w")
+                x = z*alpha + z_prime*(1 - alpha)
+                temporal_layer_idx += 1
+            else:
+                x = z
+            skips.append(x)
+            if (block_idx + 1) % self.num_res_blocks == 0 and downsample_idx < len(self.encoder_downsamples):
+                x = self.encoder_downsamples[downsample_idx](x)
+                downsample_idx += 1
+        
+        # ========== SECTION 3: ENCODER WITH TEMPORAL ==========
+        for block_idx, block in enumerate(self.bottleneck):
+            # Apply the spatial block
+            z = block(x, time_emb)
+            # Track the global block index
+            global_block_idx = len(self.encoder_blocks) + block_idx
+            if global_block_idx in self.temporal_block_indices:
+                temp_layer = self.temporal_layers[temporal_layer_idx]
+                alpha = self.alphas[temporal_layer_idx]
+                # Reshape for z_video
+                z_video = rearrange(z, "(b t) c h w -> b c t h w", b=B, t=T)
+                # Apply temporal layer
+                z_prime_video = temp_layer(z_video)
+                # Reshape
+                z_prime = rearrange(z_prime_video, "b c t h w -> (b t) c h w")
+                # Apply the alpha linear combination
+                x = z*alpha + z_prime*(1 - alpha)
+                temporal_layer_idx += 1
+            else:
+                x = z
+
+        # ========== SECTION 5: DECODER WITH TEMPORAL ==========
+        for block_idx, block in enumerate(self.decoder_blocks):
+            # Pop the skip connection
+            skip = skips.pop()
+            # Apply spatial block
+            z = block(x, skip, time_emb)
+            # Track the global block index
+            global_block_idx = len(self.encoder_blocks) + len(self.bottleneck) + block_idx
+            if global_block_idx in self.temporal_block_indices:
+                temp_layer = self.temporal_layers[temporal_layer_idx]
+                alpha = self.alphas[temporal_layer_idx]
+                # Reshape for video
+                z_video = rearrange(z, "(b t) c h w -> b c t h w", b=B, t=T)
+                # Apply temporal attention layer
+                z_prime_video = temp_layer(z_video)
+                # Reshape back
+                z_prime = rearrange(z_prime_video, "b c t h w -> (b t) c h w")
+                x = z*alpha + z_prime*(1 - alpha)
+                temporal_layer_idx += 1
+            else:
+                x = z
+        
+        # ========== SECTION 6: OUTPUT ==========
+        # Pass through conv_out
+        x = self.conv_out(x)  # (B*T, channels, H, W) → (B*T, out_channels, H, W)
+
+        # Reshape back to video format
+        x = rearrange(x, "(b t) c h w -> b c t h w", b=B, t=T)  # (B*T, out_channels, H, W) → (B, out_channels, T, H, W)
+
+        return x
