@@ -2,8 +2,8 @@
 A temporal layer which goes in between spatial layers
 """
 import torch.nn as nn
-from src.modules.temporal_attention import TemporalAttention
 from src.modules.conv_3d import Conv3DBlock
+from src.modules.temporal_attention import TemporalAttention
 
 class TemporalLayer(nn.Module):
     """
