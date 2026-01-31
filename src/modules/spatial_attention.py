@@ -23,7 +23,7 @@ class SpatialAttention(nn.Module):
         Forward pass
         x: (B, C, H, W)
         """
-        B, C, H, W = x.shape
+        _, _, H, W = x.shape
         # Reshape to (B, H*W, C)
         x = rearrange(x, "b c h w -> b (h w) c")
         # Apply attention
