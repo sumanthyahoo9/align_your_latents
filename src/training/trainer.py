@@ -1,6 +1,7 @@
 """
 The main trainer class
 """
+import os
 from pathlib import Path
 from tqdm import tqdm
 import torch
@@ -148,10 +149,42 @@ class VideoLDMTrainer:
         print("Training complete")
         self.writer.close()
     
-    def save_checkpoint(self, checkpoint) -> None:
+    def save_checkpoint(self, filename: str) -> None:
         """
         Save the checkpoint
         """
-        pass
+        checkpoint_path = os.path.join(self.config.checkpoint_dir, filename)
+        checkpoint = {
+            'epoch': self.epoch,
+            'global_step': self.global_step,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'config': self.config,
+        }
+        if self.scaler is not None:
+            checkpoint['scaler_state_dict'] = self.scaler.state_dict()
+        torch.save(checkpoint, checkpoint_path)
+        print(f"Checkpoint saved at {checkpoint_path}")
+    
+    def load_checkpoint(self, checkpoint_path: str):
+        """
+        Load model checkpoint
+        """
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        # Restore model state
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # Restore training state
+        self.epoch = checkpoint["epoch"]
+        self.global_step = checkpoint["global_step"]
+        # Restore scaler if using mixed precision
+        if self.scaler is not None and 'scaler_state_dict' in checkpoint:
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+        
+        print(f"✓ Checkpoint loaded: {checkpoint_path}")
+        print(f"  Resuming from epoch {self.epoch}, step {self.global_step}")
+        
 
 
