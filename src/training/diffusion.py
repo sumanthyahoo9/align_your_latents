@@ -1,5 +1,6 @@
 """
 Noise scheduler
+Unit test at src/tests/test_diffusion.py
 """
 import torch
 

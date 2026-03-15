@@ -1,5 +1,6 @@
 """
 3D convolution
+Unit test at src/tests/test_conv3d.py
 """
 import torch.nn as nn
 

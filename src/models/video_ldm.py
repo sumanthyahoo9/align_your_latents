@@ -95,7 +95,7 @@ class VideoUnet(UNet):
             out_ch = channels[level]
             print(f"=== DECODER Level {level}: out_ch={out_ch}, current_res={current_res} ===")
             
-            for block_num in range(num_res_blocks):
+            for _ in range(num_res_blocks):
                 print(f"  Block {block_idx}: channels={out_ch}, res={current_res}")
                 
                 if current_res in add_temporal_at_resolutions and level > 0:
@@ -256,7 +256,7 @@ class VideoUnet(UNet):
                 x = z
         
         # ========== SECTION 6: OUTPUT ==========
-        x = self.conv_out(x)
+        x = self.conv_out(x) # (b t) c h w
         
         # Reshape back to video format
         x = rearrange(x, "(b t) c h w -> b c t h w", b=B, t=T)

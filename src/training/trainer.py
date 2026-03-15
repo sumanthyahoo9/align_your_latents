@@ -120,7 +120,7 @@ class VideoLDMTrainer:
     
     def train(self, dataloader):
         """
-        Main trainin loop
+        Main training loop
         """
         for epoch in range(self.config.num_epochs):
             self.epoch = epoch
